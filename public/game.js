@@ -786,7 +786,7 @@ async function boot() {
 
   // Service worker / offline readiness note.
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/sw.js")
+    navigator.serviceWorker.register("./sw.js")
       .then(() => { $("set-offline").textContent = "Offline mode ready — you can play without internet."; })
       .catch(() => { $("set-offline").textContent = "Offline mode not available in this browser context."; });
   }

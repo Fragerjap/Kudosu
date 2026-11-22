@@ -10,10 +10,10 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Kudosu">
-  <link rel="manifest" href="/public/manifest.webmanifest">
-  <link rel="icon" type="image/png" href="/public/assets/icons/icon.png">
-  <link rel="apple-touch-icon" href="/public/assets/icons/icon.png">
-  <link rel="stylesheet" href="/public/styles.css">
+  <link rel="manifest" href="./public/manifest.webmanifest">
+  <link rel="icon" type="image/png" href="./public/assets/icons/icon.png">
+  <link rel="apple-touch-icon" href="./public/assets/icons/icon.png">
+  <link rel="stylesheet" href="./public/styles.css">
   <!-- Bolt: Supabase removed — local-only IndexedDB, no external services. -->
   <meta property="og:image" content="https://bolt.new/static/og_default.png">
   <meta name="twitter:card" content="summary_large_image">
@@ -23,7 +23,7 @@
 
   <!-- ======================= Bolt: HUD (always visible) ================= -->
   <header class="hud" id="hud">
-    <div class="stat stat-gold"><img class="currency-icon" src="/public/assets/img/kucoin.webp" alt="Gold"><span id="stat-gold">0</span></div>
+    <div class="stat stat-gold"><img class="currency-icon" src="./public/assets/img/kucoin.webp" alt="Gold"><span id="stat-gold">0</span></div>
     <div class="stat"><span class="icon">❤️</span><span id="stat-hp">5/5</span></div>
     <div class="stat"><span class="icon">⛩️</span><span id="stat-level">1</span><span id="stat-xp" class="xp-text">0/3</span></div>
     <div class="xp-bar-track"><div class="xp-bar" id="xp-bar"></div></div>
@@ -131,9 +131,9 @@
   <div id="toast" hidden></div>
 
   <!-- ======================= Bolt: scripts ============================= -->
-  <script src="/public/vendor/localforage.min.js"></script>
-  <script src="/src/utils/sudoku-generator.js"></script>
-  <script src="/public/db.js"></script>
-  <script src="/public/game.js"></script>
+  <script src="./public/vendor/localforage.min.js"></script>
+  <script src="./src/utils/sudoku-generator.js"></script>
+  <script src="./public/db.js"></script>
+  <script src="./public/game.js"></script>
 </body>
 </html>
