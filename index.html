@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <title>Kudosu — Sudoku Adventure</title>
+  <meta name="description" content="Offline sudoku adventure: cozy castle, four puzzle lands, gold and levels.">
+  <meta name="theme-color" content="#06282e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Kudosu">
+  <link rel="manifest" href="/public/manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="/public/assets/icons/icon.svg">
+  <link rel="stylesheet" href="/public/styles.css">
+  <script>
+    // Bolt: Supabase project endpoints (public anon key — safe for the client).
+    window.SUPABASE_URL = "https://0ec90b57d6e95fcbda19832f.supabase.co";
+    window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJib2x0IiwicmVmIjoiMGVjOTBiNTdkNmU5NWZjYmRhMTk4MzJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4ODE1NzQsImV4cCI6MTc1ODg4MTU3NH0.9I8-U0x86Ak8t2DGaIk0HfvTSLsAyzdnz-Nw00mMkKw";
+  </script>
+  <meta property="og:image" content="https://bolt.new/static/og_default.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://bolt.new/static/og_default.png">
+</head>
+<body>
+
+  <!-- ======================= Bolt: HUD (always visible) ================= -->
+  <header class="hud" id="hud" hidden>
+    <div class="stat"><span class="icon">🪙</span><span id="stat-gold">0</span></div>
+    <div class="stat"><span class="icon">❤️</span><span id="stat-hp">5/5</span></div>
+    <div class="stat"><span class="icon">⛩️</span><span id="stat-level">1</span><span id="stat-xp" class="xp-text">0/3</span></div>
+    <div class="xp-bar-track"><div class="xp-bar" id="xp-bar"></div></div>
+    <span class="spacer"></span>
+    <button id="btn-settings" aria-label="Settings">☰</button>
+  </header>
+
+  <!-- ======================= Bolt: login screen ======================== -->
+  <main class="screen" id="screen-login">
+    <div class="login-card">
+      <h1 id="auth-title">Welcome back</h1>
+      <p class="settings-note">Nickname + short password, no email. A 3-character PIN is fine.</p>
+      <input id="auth-nick" type="text" placeholder="Nickname" autocomplete="username">
+      <input id="auth-pass" type="password" placeholder="Password (3+ characters)" autocomplete="current-password">
+      <p id="auth-error" role="alert"></p>
+      <button id="auth-go">Enter</button>
+      <button id="auth-toggle" class="linklike">New here? Create account</button>
+      <input id="auth-mode" type="hidden" value="login">
+    </div>
+  </main>
+
+  <!-- ======================= Bolt: map screen ========================== -->
+  <main class="screen" id="screen-map" hidden>
+    <div class="map-wrap">
+      <div class="map-art" id="map-art">
+        <!-- Bolt: zone buttons; backgrounds switch to webp art when provided -->
+        <button class="zone-btn" data-d="4" aria-label="North: insane puzzles">⛰️<span>Insane</span></button>
+        <button class="zone-btn" data-d="1" aria-label="West: easy puzzles">☁️<span>Easy</span></button>
+        <button class="btn-castle" id="btn-castle" aria-label="Castle shop">🏯<span>Kudosu Castle</span></button>
+        <button class="zone-btn" data-d="3" aria-label="East: hard puzzles">🏔️<span>Hard</span></button>
+        <button class="zone-btn" data-d="2" aria-label="South: normal puzzles">🌲<span>Normal</span></button>
+      </div>
+      <button id="map-resume" hidden>Continue <span id="map-resume-zone"></span> puzzle</button>
+    </div>
+  </main>
+
+  <!-- ======================= Bolt: puzzle screen ======================= -->
+  <main class="screen" id="screen-puzzle" hidden>
+    <div class="puzzle-wrap">
+      <div class="topbar"><h2 id="puzzle-zone">Meadow</h2></div>
+      <div class="sudoku-grid" id="sudoku-grid" role="grid" aria-label="Sudoku board"></div>
+      <div class="dial" id="dial" aria-label="Digit picker"></div>
+      <div class="toolbar">
+        <button id="btn-notes" aria-pressed="false">✏️ Notes</button>
+        <button id="btn-erase">🧽 Erase</button>
+        <button id="btn-undo">↩️ Undo</button>
+        <button id="btn-abandon">🗺️ Map</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ======================= Bolt: castle shop screen ================== -->
+  <main class="screen" id="screen-shop" hidden>
+    <div class="topbar"><h2 id="puzzle-zone-title">Kudosu Castle</h2><button id="shop-back">✕</button></div>
+    <div class="shop-art" id="shop-art">🧙‍♂️</div>
+    <p id="shop-debt" hidden></p>
+    <div class="shop-items">
+      <button id="shop-buy-hp">Restore 1 HP — 3 gold</button>
+      <button id="shop-buy-maxhp">+1 Max HP — 500 gold</button>
+    </div>
+  </main>
+
+  <!-- ======================= Bolt: settings screen ===================== -->
+  <main class="screen" id="screen-settings" hidden>
+    <div class="topbar">
+      <h2>Settings</h2>
+      <button id="set-back">✕</button>
+    </div>
+    <div class="setting-row"><span>Player</span><strong id="set-nick">guest</strong></div>
+    <div class="setting-row">
+      <span>Theme</span>
+      <select id="set-theme">
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <span>Digit animation speed</span>
+      <select id="set-speed">
+        <option value="slow">Slow</option>
+        <option value="normal">Normal</option>
+        <option value="fast">Fast</option>
+        <option value="instant">Instant</option>
+      </select>
+    </div>
+    <div class="btn-row">
+      <button id="set-save">💾 Save progress</button>
+      <button id="set-export" title="Export solved puzzles as text">📤 Export solved</button>
+    </div>
+    <button id="set-sync-help" class="linklike" style="background:none;border:none;color:var(--ink-soft);text-decoration:underline;">? Why save?</button>
+    <p class="settings-note" id="set-sync-note">
+      Mobile browsers may clear offline app data after a week of inactivity or
+      when storage runs low — press Save now and then to keep your progress safe.
+    </p>
+    <p class="settings-note" id="set-offline"></p>
+    <button id="set-logout">Log out</button>
+  </main>
+
+  <!-- ======================= Bolt: loading overlay ===================== -->
+  <div class="modal" id="screen-loading" hidden>
+    <div class="modal-card">
+      <h3 id="loading-zone">Meadow</h3>
+      <div class="spinner"></div>
+      <p id="loading-sub">Consulting the stars…</p>
+    </div>
+  </div>
+
+  <!-- ======================= Bolt: win modal =========================== -->
+  <div class="modal" id="screen-win" hidden>
+    <div class="modal-card">
+      <h3>Puzzle solved!</h3>
+      <p id="win-reward"></p>
+      <button id="win-close">🗺️ Back to map</button>
+    </div>
+  </div>
+
+  <!-- ======================= Bolt: toast =============================== -->
+  <div id="toast" hidden></div>
+
+  <!-- ======================= Bolt: scripts ============================= -->
+  <script src="/public/vendor/localforage.min.js"></script>
+  <script src="/src/utils/sudoku-generator.js"></script>
+  <script src="/public/db.js"></script>
+  <script src="/public/game.js"></script>
+</body>
+</html>
