@@ -12,12 +12,12 @@
 // ---------------------------------------------------------------------------
 const ZONES = {
   1: { name: "Meadow", dir: "west", reward: 1 },
-  2: { name: "Forest", dir: "south", reward: 2 },
-  3: { name: "Peaks", dir: "east", reward: 3 },
-  4: { name: "Volcano", dir: "north", reward: 4 },
+  2: { name: "Forest", dir: "south", reward: 3 },
+  3: { name: "Peaks", dir: "east", reward: 5 },
+  4: { name: "Volcano", dir: "north", reward: 6 },
 };
 const MAX_HP_BASE = 5;
-const REGEN_MS = 5 * 60 * 60 * 1000; // one HP per 5 hours
+const REGEN_MS = 5 * 60 * 60 * 1000 /5/60*5; // one HP per 5 hours // per 5 mins for tests
 const DEBT_LIMIT = -50;
 const SHOP_HP_COST = 3;      // gold per HP when player can afford it
 const SHOP_HP_DEBT_COST = 4; // gold per HP added as debt when broke
