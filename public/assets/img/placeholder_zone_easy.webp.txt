@@ -1,0 +1,3 @@
+Bolt: placeholder image. Replace with your real `zone_easy.webp` (remove the
+placeholder_ prefix). Theme: sunny cloud meadow with sudoku-themed props
+(cells, numbers, erasers).

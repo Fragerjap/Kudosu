@@ -1,0 +1,2 @@
+Bolt: placeholder image. Replace with your real `zone_hard.webp` (remove the
+placeholder_ prefix). Theme: snowy mountains with sudoku-themed props.
