@@ -13,11 +13,7 @@
   <link rel="manifest" href="/public/manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="/public/assets/icons/icon.svg">
   <link rel="stylesheet" href="/public/styles.css">
-  <script>
-    // Bolt: Supabase project endpoints (public anon key — safe for the client).
-    window.SUPABASE_URL = "https://0ec90b57d6e95fcbda19832f.supabase.co";
-    window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJib2x0IiwicmVmIjoiMGVjOTBiNTdkNmU5NWZjYmRhMTk4MzJmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg4ODE1NzQsImV4cCI6MTc1ODg4MTU3NH0.9I8-U0x86Ak8t2DGaIk0HfvTSLsAyzdnz-Nw00mMkKw";
-  </script>
+  <!-- Bolt: Supabase removed — local-only IndexedDB, no external services. -->
   <meta property="og:image" content="https://bolt.new/static/og_default.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="https://bolt.new/static/og_default.png">
@@ -25,7 +21,7 @@
 <body>
 
   <!-- ======================= Bolt: HUD (always visible) ================= -->
-  <header class="hud" id="hud" hidden>
+  <header class="hud" id="hud">
     <div class="stat"><span class="icon">🪙</span><span id="stat-gold">0</span></div>
     <div class="stat"><span class="icon">❤️</span><span id="stat-hp">5/5</span></div>
     <div class="stat"><span class="icon">⛩️</span><span id="stat-level">1</span><span id="stat-xp" class="xp-text">0/3</span></div>
@@ -34,19 +30,7 @@
     <button id="btn-settings" aria-label="Settings">☰</button>
   </header>
 
-  <!-- ======================= Bolt: login screen ======================== -->
-  <main class="screen" id="screen-login">
-    <div class="login-card">
-      <h1 id="auth-title">Welcome back</h1>
-      <p class="settings-note">Nickname + short password, no email. A 3-character PIN is fine.</p>
-      <input id="auth-nick" type="text" placeholder="Nickname" autocomplete="username">
-      <input id="auth-pass" type="password" placeholder="Password (3+ characters)" autocomplete="current-password">
-      <p id="auth-error" role="alert"></p>
-      <button id="auth-go">Enter</button>
-      <button id="auth-toggle" class="linklike">New here? Create account</button>
-      <input id="auth-mode" type="hidden" value="login">
-    </div>
-  </main>
+  <!-- Bolt: login screen removed — local-only, straight to map. -->
 
   <!-- ======================= Bolt: map screen ========================== -->
   <main class="screen" id="screen-map" hidden>
@@ -95,7 +79,7 @@
       <h2>Settings</h2>
       <button id="set-back">✕</button>
     </div>
-    <div class="setting-row"><span>Player</span><strong id="set-nick">guest</strong></div>
+    <!-- Bolt: player row removed — local-only, no nickname. -->
     <div class="setting-row">
       <span>Theme</span>
       <select id="set-theme">
@@ -112,17 +96,16 @@
         <option value="instant">Instant</option>
       </select>
     </div>
+    <!-- Bolt: Import/Export replace Save progress + Export solved (local-only). -->
     <div class="btn-row">
-      <button id="set-save">💾 Save progress</button>
-      <button id="set-export" title="Export solved puzzles as text">📤 Export solved</button>
+      <button id="set-export" title="Export stats + solved puzzles to a .txt file">📤 Export</button>
+      <button id="set-import" title="Import stats + solved puzzles from a .txt file">📥 Import</button>
     </div>
-    <button id="set-sync-help" class="linklike" style="background:none;border:none;color:var(--ink-soft);text-decoration:underline;">? Why save?</button>
-    <p class="settings-note" id="set-sync-note">
-      Mobile browsers may clear offline app data after a week of inactivity or
-      when storage runs low — press Save now and then to keep your progress safe.
+    <p class="settings-note">
+      Export saves your gold, level, XP, and solved puzzles to a .txt file.
+      Import it on a new device or after data is cleared.
     </p>
     <p class="settings-note" id="set-offline"></p>
-    <button id="set-logout">Log out</button>
   </main>
 
   <!-- ======================= Bolt: loading overlay ===================== -->

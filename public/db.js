@@ -1,21 +1,12 @@
 /*
- * Bolt: Kudosu storage layer.
+ * Bolt: Kudosu storage layer (local-only, no external services).
  * 1) Local persistence: localForage (IndexedDB) for the solved-puzzle set and
  *    player stats; localStorage for the one active puzzle (fast synchronous
  *    save on visibility change).
- * 2) Accounts + sync: Supabase RPCs backed by our own tables
- *    (players / player_progress / solved_puzzles / player_sessions).
- *    Passwords are salted + SHA-256 hashed in the browser; the plain
- *    password never leaves the device. Sessions are bearer tokens that
- *    effectively never expire (10 years), so nobody is ever kicked out.
+ * 2) Export/import: one .txt file — row 1 is player stats (CSV header + values),
+ *    remaining rows are 81-char solved-puzzle strings. Fully offline.
  */
 "use strict";
-
-// ---------------------------------------------------------------------------
-// Bolt: Supabase REST endpoints (read from .env-style globals set in index.html)
-// ---------------------------------------------------------------------------
-const SUPABASE_URL = window.SUPABASE_URL || "";
-const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || "";
 
 // ---------------------------------------------------------------------------
 // Bolt: localForage instances (IndexedDB, offline-first)
@@ -28,12 +19,6 @@ const solvedStore = localforage.createInstance({
 const statsStore = localforage.createInstance({
   name: "kudosu",
   storeName: "player_stats",
-});
-
-// Current player identity (nickname + session token), kept locally forever.
-const sessionStore = localforage.createInstance({
-  name: "kudosu",
-  storeName: "session",
 });
 
 // ---------------------------------------------------------------------------
@@ -51,7 +36,7 @@ async function isPuzzleSolved(puzzleString) {
   return hit === true;
 }
 
-/** All solved puzzles as an array of 81-char strings (for export / sync). */
+/** All solved puzzles as an array of 81-char strings (for export). */
 async function getAllSolvedPuzzles() {
   const out = [];
   await solvedStore.iterate((value, key) => {
@@ -62,7 +47,7 @@ async function getAllSolvedPuzzles() {
   return out;
 }
 
-/** Import a batch of 81-char strings (used by sync + export/import). */
+/** Import a batch of 81-char strings (used by import). Returns count added. */
 async function importSolvedPuzzles(list) {
   if (!Array.isArray(list)) return 0;
   let added = 0;
@@ -132,127 +117,63 @@ function clearActivePuzzle() {
 }
 
 // ---------------------------------------------------------------------------
-// Bolt: password hashing (salted SHA-256, hex output)
+// Bolt: export — single .txt file. Row 1 = stats CSV, rows 2+ = solved puzzles.
+// Format: gold,hp,maxHp,maxHpBuys,xp,hpUpdatedAt,lastModified
 // ---------------------------------------------------------------------------
-// Bolt: password hashing — sha256(nickname + password + "kudosu"), hex output.
-// Matches the scheme used for the admin account seed.
-async function hashPassword(nickname, password) {
-  const data = new TextEncoder().encode(
-    `${nickname.toLowerCase()}${password}kudosu`
-  );
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-// ---------------------------------------------------------------------------
-// Bolt: session helpers
-// ---------------------------------------------------------------------------
-async function getSavedSession() {
-  return sessionStore.getItem("session"); // { nickname, token } or null
-}
-
-async function setSavedSession(session) {
-  if (session) {
-    await sessionStore.setItem("session", session);
-  } else {
-    await sessionStore.removeItem("session");
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Bolt: Supabase RPC wrapper (does NOT use the supabase-js SDK, plain fetch)
-// ---------------------------------------------------------------------------
-async function callRpc(fn, args) {
-  // Bolt: direct call to the Supabase database (the project's connected
-  // backend). No intermediate proxy.
-  let res;
-  try {
-    res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-      body: JSON.stringify(args),
-    });
-  } catch (e) {
-    throw new Error(
-      "No connection to the game server. Check internet once to sign in or sync."
-    );
-  }
-  const text = await res.text();
-  let data = null;
-  try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
-
-  if (!res.ok) {
-    const msg = (data && (data.message || data.error)) || `Request failed (${res.status})`;
-    throw new Error(msg);
-  }
-  return data;
-}
-
-// ---------------------------------------------------------------------------
-// Bolt: account actions (first login requires network; after that offline)
-// ---------------------------------------------------------------------------
-async function registerAccount(nickname, password) {
-  const hash = await hashPassword(nickname, password);
-  const token = await callRpc("kudosu_register", {
-    p_nickname: nickname,
-    p_password_hash: hash,
-  });
-  const session = { nickname: nickname.toLowerCase(), token };
-  await setSavedSession(session);
-  return session;
-}
-
-async function loginAccount(nickname, password) {
-  const hash = await hashPassword(nickname, password);
-  const token = await callRpc("kudosu_login", {
-    p_nickname: nickname,
-    p_password_hash: hash,
-  });
-  const session = { nickname: nickname.toLowerCase(), token };
-  await setSavedSession(session);
-  return session;
-}
-
-async function logoutAccount() {
-  await setSavedSession(null);
-}
-
-// ---------------------------------------------------------------------------
-// Bolt: sync (Save button). Last-Write-Wins via lastModified; solved merged.
-// ---------------------------------------------------------------------------
-async function syncToServer() {
-  const session = await getSavedSession();
-  if (!session || !session.token) {
-    throw new Error("Not signed in");
-  }
+async function exportData() {
   const stats = await loadLocalStats();
   const solved = await getAllSolvedPuzzles();
-
-  const result = await callRpc("kudosu_save", {
-    p_token: session.token,
-    p_gold: Math.round(stats.gold),
-    p_hp: Math.round(stats.hp),
-    p_max_hp: Math.round(stats.maxHp),
-    p_max_hp_buys: Math.round(stats.maxHpBuys),
-    p_xp: Math.round(stats.xp),
-    p_hp_updated_at: new Date(stats.hpUpdatedAt || Date.now()).toISOString(),
-    p_last_modified: new Date(stats.lastModified || Date.now()).toISOString(),
-    p_solved: solved,
-  });
-  return result;
+  const header = "gold,hp,maxHp,maxHpBuys,xp,hpUpdatedAt,lastModified";
+  const statsLine = [
+    Math.round(stats.gold),
+    Math.round(stats.hp),
+    Math.round(stats.maxHp),
+    Math.round(stats.maxHpBuys),
+    Math.round(stats.xp),
+    Math.round(stats.hpUpdatedAt),
+    Math.round(stats.lastModified),
+  ].join(",");
+  const lines = [header, statsLine, ...solved];
+  return lines.join("\n");
 }
 
-/** Pull server progress (used after login on a fresh device). */
-async function loadFromServer() {
-  const session = await getSavedSession();
-  if (!session || !session.token) {
-    throw new Error("Not signed in");
+// ---------------------------------------------------------------------------
+// Bolt: import — parse a .txt file produced by exportData().
+// Row 1 = header (ignored), row 2 = stats CSV, rows 3+ = solved puzzles.
+// Returns { statsImported: boolean, puzzlesAdded: number }.
+// ---------------------------------------------------------------------------
+async function importData(text) {
+  const lines = text.split(/\r?\n/).filter((l) => l.length > 0);
+  if (lines.length < 2) throw new Error("File is empty or invalid.");
+
+  let statsImported = false;
+  let puzzlesAdded = 0;
+
+  // Bolt: row 2 = stats line (CSV). Validate by checking it starts with a number.
+  if (lines.length >= 2 && /^\d/.test(lines[1])) {
+    const parts = lines[1].split(",");
+    if (parts.length >= 7) {
+      const stats = {
+        gold: Number(parts[0]) || 0,
+        hp: Number(parts[1]) || 0,
+        maxHp: Number(parts[2]) || 5,
+        maxHpBuys: Number(parts[3]) || 0,
+        xp: Number(parts[4]) || 0,
+        hpUpdatedAt: Number(parts[5]) || Date.now(),
+        lastModified: Number(parts[6]) || Date.now(),
+      };
+      await saveLocalStats(stats);
+      statsImported = true;
+    }
   }
-  return callRpc("kudosu_load", { p_token: session.token });
+
+  // Bolt: rows 3+ = solved puzzle strings (81-char, digits only).
+  const puzzleLines = lines.slice(2).filter((l) => /^[0-9]{81}$/.test(l));
+  if (puzzleLines.length > 0) {
+    puzzlesAdded = await importSolvedPuzzles(puzzleLines);
+  }
+
+  return { statsImported, puzzlesAdded };
 }
 
 // Expose to the game layer (no modules needed — plain script tags).
@@ -266,10 +187,6 @@ window.KudosuDB = {
   saveActivePuzzle,
   loadActivePuzzle,
   clearActivePuzzle,
-  getSavedSession,
-  registerAccount,
-  loginAccount,
-  logoutAccount,
-  syncToServer,
-  loadFromServer,
+  exportData,
+  importData,
 };

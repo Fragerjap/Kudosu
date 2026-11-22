@@ -1,6 +1,6 @@
 /*
  * Bolt: Kudosu game logic.
- * Screens: login -> map -> puzzle / castle shop / settings.
+ * Screens: map -> puzzle / castle shop / settings (no login — local-only).
  * Economy: gold, HP (regen 1/5h * level speed), XP levels, castle debt.
  * Board: selection, highlights, digit dials with progress rects, candidates,
  * undo (restores removed candidates too), wrong-move lock, digit animations.
@@ -27,9 +27,9 @@ const DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 // ---------------------------------------------------------------------------
 // Bolt: game state (single source of truth)
 // ---------------------------------------------------------------------------
+// Bolt: removed session field — local-only, no auth.
 const Game = {
   stats: null,        // { gold, hp, maxHp, maxHpBuys, xp, hpUpdatedAt, lastModified }
-  session: null,      // { nickname, token } or null
   active: null,       // active puzzle { puzzle, difficulty, cells[81], notes[81], history[], startedAt }
   selected: -1,       // selected cell index (-1 = none)
   noteMode: false,    // candidate (notes) mode
@@ -78,62 +78,22 @@ function touchStats() {
 }
 
 // ---------------------------------------------------------------------------
-// Bolt: screens — tiny router
+// Bolt: screens — tiny router (login screen removed — local-only)
 // ---------------------------------------------------------------------------
 function showScreen(name) {
-  ["screen-login", "screen-map", "screen-puzzle", "screen-shop", "screen-settings"].forEach((id) => {
+  ["screen-map", "screen-puzzle", "screen-shop", "screen-settings"].forEach((id) => {
     $(id).hidden = id !== `screen-${name}`;
   });
-  // Bolt: HUD (gold/HP/level) hidden only on the login screen.
-  $("hud").hidden = name === "login";
+  // Bolt: HUD (gold/HP/level) always visible now.
+  $("hud").hidden = false;
   document.body.dataset.screen = name;
   if (name === "map") renderMap();
 }
 
 // ---------------------------------------------------------------------------
-// Bolt: login screen
+// Bolt: boot — load local stats and go straight to the map (no login)
 // ---------------------------------------------------------------------------
-async function tryAuth(mode) {
-  const nick = $("auth-nick").value.trim();
-  const pass = $("auth-pass").value.trim();
-  const err = $("auth-error");
-  err.textContent = "";
-  if (nick.length < 3) { err.textContent = "Nickname: at least 3 characters."; return; }
-  if (pass.length < 3) { err.textContent = "Password: at least 3 characters (a short PIN is fine)."; return; }
-  $("auth-go").disabled = true;
-  try {
-    Game.session = mode === "login"
-      ? await KudosuDB.loginAccount(nick, pass)
-      : await KudosuDB.registerAccount(nick, pass);
-    await afterAuth();
-  } catch (e) {
-    // Bolt: friendly wording for network failures ("Failed to fetch" etc.).
-    const m = String(e.message || e);
-    err.textContent = /fetch|network|name or service|resolve/i.test(m)
-      ? "No connection to the game server. Check internet once to sign in — after that the game works fully offline."
-      : m;
-  } finally {
-    $("auth-go").disabled = false;
-  }
-}
-
-async function afterAuth() {
-  // First entry on this device: pull server progress.
-  const local = await KudosuDB.loadLocalStats();
-  if (local.lastModified === 0) {
-    try {
-      const remote = await KudosuDB.loadFromServer();
-      const merged = {
-        gold: remote.progress.gold, hp: remote.progress.hp,
-        maxHp: remote.progress.maxHp, maxHpBuys: remote.progress.maxHpBuys,
-        xp: remote.progress.xp,
-        hpUpdatedAt: new Date(remote.progress.hpUpdatedAt).getTime(),
-        lastModified: new Date(remote.progress.lastModified).getTime(),
-      };
-      await KudosuDB.saveLocalStats(merged);
-      await KudosuDB.importSolvedPuzzles(remote.solved || []);
-    } catch (e) { /* first device use: keep defaults */ }
-  }
+async function loadAndStart() {
   Game.stats = await KudosuDB.loadLocalStats();
   applyRegen();
   showScreen("map");
@@ -681,33 +641,54 @@ function shopBuyMaxHp() {
 }
 
 // ---------------------------------------------------------------------------
-// Bolt: settings — save/export/import, theme, speed, offline status
+// Bolt: settings — export/import (local-only), theme, speed, offline status
 // ---------------------------------------------------------------------------
-async function settingsSave() {
-  const btn = $("set-save");
-  if (!Game.session) { toast("Sign in first to sync."); return; }
+// Bolt: export — player stats + solved puzzles in one .txt file.
+async function settingsExport() {
+  const btn = $("set-export");
   btn.disabled = true;
   try {
-    await KudosuDB.syncToServer();
-    toast("Progress saved to the cloud.");
-    $("set-sync-note").textContent = "Last saved: just now";
+    const text = await KudosuDB.exportData();
+    const solvedCount = (text.split("\n").length - 2);
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "kudosu-save.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+    toast(`Exported stats + ${Math.max(0, solvedCount)} solved puzzles.`);
   } catch (e) {
-    toast(`Save failed: ${e.message}`);
+    toast(`Export failed: ${e.message}`);
   } finally {
     btn.disabled = false;
   }
 }
 
-async function settingsExport() {
-  const list = await KudosuDB.getAllSolvedPuzzles();
-  const blob = new Blob([list.join("\n")], { type: "text/plain" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "kudosu-solved.txt";
-  a.click();
-  URL.revokeObjectURL(url);
-  toast(`Exported ${list.length} solved puzzles.`);
+// Bolt: import — read a .txt file (stats row + solved puzzle rows) and merge.
+function settingsImport() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".txt,text/plain";
+  input.addEventListener("change", async () => {
+    const file = input.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const result = await KudosuDB.importData(text);
+      // Bolt: reload stats into the game so the HUD reflects imported values.
+      Game.stats = await KudosuDB.loadLocalStats();
+      applyRegen();
+      renderStats();
+      const parts = [];
+      if (result.statsImported) parts.push("stats restored");
+      if (result.puzzlesAdded > 0) parts.push(`${result.puzzlesAdded} new solved puzzles`);
+      toast(parts.length ? `Imported: ${parts.join(", ")}.` : "Nothing new to import.");
+    } catch (e) {
+      toast(`Import failed: ${e.message}`);
+    }
+  });
+  input.click();
 }
 
 function applyTheme(theme) {
@@ -748,15 +729,7 @@ async function boot() {
   applyTheme(localStorage.getItem("kudosu_theme") || "dark");
   applySpeed(localStorage.getItem("kudosu_speed") || "normal");
 
-  // Buttons — auth.
-  $("auth-go").addEventListener("click", () => tryAuth($("auth-mode").value));
-  $("auth-toggle").addEventListener("click", () => {
-    const m = $("auth-mode");
-    m.value = m.value === "register" ? "login" : "register";
-    $("auth-title").textContent = m.value === "register" ? "Create account" : "Welcome back";
-    $("auth-go").textContent = m.value === "register" ? "Create" : "Enter";
-    $("auth-toggle").textContent = m.value === "register" ? "I have an account" : "New here? Create account";
-  });
+  // Bolt: auth buttons removed — local-only, no login screen.
 
   // Map.
   document.querySelectorAll(".zone-btn").forEach((btn) => {
@@ -782,23 +755,18 @@ async function boot() {
   $("shop-buy-maxhp").addEventListener("click", shopBuyMaxHp);
   $("shop-back").addEventListener("click", () => showScreen("map"));
 
-  // Settings.
+  // Bolt: settings — no nickname (local-only), just theme/speed/export/import.
   $("btn-settings").addEventListener("click", () => {
-    Game.settingsReturn = document.body.dataset.screen || "map"; // remember where we were
+    Game.settingsReturn = document.body.dataset.screen || "map";
     if (Game.settingsReturn === "settings") Game.settingsReturn = "map";
-    Game.session && Game.session.nickname && ($("set-nick").textContent = Game.session.nickname);
     showScreen("settings");
   });
   $("set-back").addEventListener("click", () => showScreen(Game.settingsReturn || "map"));
-  $("set-save").addEventListener("click", settingsSave);
   $("set-export").addEventListener("click", settingsExport);
+  $("set-import").addEventListener("click", settingsImport);
   $("set-theme").addEventListener("change", (e) => applyTheme(e.target.value));
   $("set-speed").addEventListener("change", (e) => applySpeed(e.target.value));
-  $("set-logout").addEventListener("click", async () => {
-    await KudosuDB.logoutAccount();
-    Game.session = null;
-    showScreen("login");
-  });
+  // Bolt: logout button removed — local-only, no account.
 
   // Win screen.
   $("win-close").addEventListener("click", () => {
@@ -817,8 +785,7 @@ async function boot() {
       .catch(() => { $("set-offline").textContent = "Offline mode not available in this browser context."; });
   }
 
-  // Restore session / stats / active puzzle.
-  Game.session = await KudosuDB.getSavedSession();
+  // Bolt: load local stats + active puzzle, go straight to map (no login).
   Game.stats = await KudosuDB.loadLocalStats();
   applyRegen();
 
@@ -827,7 +794,7 @@ async function boot() {
     Game.active = act;
   }
 
-  showScreen(Game.session ? "map" : "login");
+  showScreen("map");
 }
 
 document.addEventListener("DOMContentLoaded", boot);
