@@ -3,7 +3,7 @@
  * All app assets are pre-cached on install; every fetch is answered from the
  * cache when possible so the game works fully offline (airplane mode test).
  */
-const CACHE = "kudosu-v2";
+const CACHE = "kudosu-v3";
 
 const ASSETS = [
   "./",
@@ -14,10 +14,10 @@ const ASSETS = [
   "./public/db.js",
   "./public/vendor/localforage.min.js",
   "./src/utils/sudoku-generator.js",
-  "./public/assets/icons/icon.svg",
-  "./public/assets/icons/icon-192.png",
-  "./public/assets/icons/icon-512.png",
-  "./public/assets/icons/apple-touch-icon-180.png"
+  "./public/assets/icons/icon.png",
+  "./public/assets/img/kucoin.webp",
+  "./public/assets/img/Magical_Wizard_Shop_Inventory.webp",
+  "./public/assets/img/Sudoku_Adventure_Castle_Map.webp"
 ];
 
 self.addEventListener("install", (event) => {
