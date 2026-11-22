@@ -118,8 +118,8 @@ async function enterZone(difficulty) {
   const act = Game.active;
   if (act && act.difficulty !== difficulty) {
     // Leaving to another zone keeps the unfinished puzzle; confirm new one.
-    if (!confirm(`Leave the unfinished ${ZONES[act.difficulty].name} puzzle and generate a new ${ZONES[difficulty].name} one? The old puzzle stays saved and can be continued from the map.`)) {
-      return;
+    if (!confirm(`Leave the unfinished ${ZONES[act.difficulty].name} puzzle and generate a new ${ZONES[difficulty].name} one? The old puzzle will be abandoned.`)) {
+      return;  // Previously told 'stays saved and can be continued from the map', but it was not true
     }
     // Return to the saved puzzle if the player backs out via Cancel.
   }
@@ -244,10 +244,9 @@ function isWrongLocked(i) {
 function onCellTap(i) {
   if (!Game.active) return;
   const v = cellValue(i);
-  // Bolt: instant highlight — tapping any filled cell highlights all same
-  // digits immediately; persists until another filled cell is tapped (or all
-  // of that digit get placed). Tapping the same cell again clears it.
-  Game.highlightDigit = (Game.selected === i && Game.highlightDigit === v) ? 0 : v;
+  // Bolt: filled digits set the highlight; empty cells never clear it.
+  // It remains until another filled digit is tapped or the dial completes it.
+  if (v > 0) Game.highlightDigit = v;
   Game.selected = i;
   renderBoard();
 }
@@ -257,8 +256,14 @@ function onDialDigit(d) {
   if (i === -1 || isGiven(i)) return;
   const act = Game.active;
 
+  // Bolt: correct placements are permanent and cannot be replaced or annotated.
+  if (act.cells[i] > 0) {
+    toast("Locked — correct digits can't be changed.");
+    return;
+  }
+
   if (Game.noteMode) {
-    pushUndo();
+    pushUndo(i);
     act.notes[i] ^= (1 << (d - 1)); // toggle small digit
     afterPlayerMove(i, false);
     return;
@@ -277,7 +282,7 @@ function onDialDigit(d) {
   // Bolt: absolute validation — a digit may only go in if it matches the
   // puzzle's solution (no wrong placement even without visible conflicts).
   if (Number(act.solution[i]) !== d) {
-    pushUndo();
+    pushUndo(i);
     act.cells[i] = -d; // red ghost digit — shown, but NOT counted as placed
     Game.stats.hp = Math.max(0, Game.stats.hp - 1);
     Game.stats.hpUpdatedAt = Date.now();
@@ -357,7 +362,7 @@ function onErase() {
   const v = Game.active.cells[i];
   // Bolt: correct digits lock permanently; only red ghosts can be erased.
   if (v > 0) { toast("Locked — correct digits can't be removed."); return; }
-  pushUndo();
+  pushUndo(i);
   Game.active.cells[i] = 0;
   afterPlayerMove(i, false);
 }
@@ -368,13 +373,10 @@ function onNoteToggle() {
   $("btn-notes").setAttribute("aria-pressed", String(Game.noteMode));
 }
 
-function pushUndo() {
+function pushUndo(i) {
   const act = Game.active;
-  // Bolt: correct placements are permanent — the undo stack only needs the
-  // board as it was BEFORE the first correct placement. We store, for each
-  // snapshot, which cells were still editable at that moment.
-  const editable = act.cells.map((v, k) => !isGiven(k) && v <= 0);
-  Game.undoStack.push({ cells: act.cells.slice(), notes: act.notes.slice(), editable });
+  // Bolt: store only one editable cell so later correct placements stay intact.
+  Game.undoStack.push({ index: i, cell: act.cells[i], notes: act.notes[i] });
   if (Game.undoStack.length > 500) Game.undoStack.shift();
 }
 
@@ -382,10 +384,11 @@ function onUndo() {
   const snap = Game.undoStack.pop();
   if (!snap) { toast("Nothing to undo."); return; }
   const act = Game.active;
-  // Bolt: restore only cells that were still editable in the snapshot —
-  // correctly placed digits are permanent and survive the undo.
-  act.cells = act.cells.map((v, k) => snap.editable[k] ? snap.cells[k] : v);
-  act.notes = snap.notes;
+  // Bolt: undo only the last editable action; correct digits are never restored over.
+  if (!isGiven(snap.index) && act.cells[snap.index] <= 0) {
+    act.cells[snap.index] = snap.cell;
+    act.notes[snap.index] = snap.notes;
+  }
   persistActive();
   renderBoard();
   renderDial();
@@ -465,7 +468,7 @@ function renderBoard() {
 }
 
 // ---------------------------------------------------------------------------
-// Bolt: digit dial — 9 digit buttons with colored progress rectangles
+// Bolt: digit dial — 9 digit buttons with circular progress rings
 // ---------------------------------------------------------------------------
 function buildDial() {
   const dial = $("dial");
@@ -475,7 +478,7 @@ function buildDial() {
     btn.className = "dial-btn";
     btn.dataset.d = d;
     btn.innerHTML = `
-      <span class="dial-rects" aria-hidden="true"></span>
+      <span class="dial-ring" aria-hidden="true"></span>
       <span class="dial-digit">${d}</span>`;
     btn.addEventListener("click", () => onDialDigit(Number(d)));
     dial.appendChild(btn);
@@ -493,13 +496,11 @@ function renderDial() {
   document.querySelectorAll(".dial-btn").forEach((btn) => {
     const d = Number(btn.dataset.d);
     const left = 9 - placed[d];
-    btn.classList.toggle("done", left === 0);
-    const rects = btn.querySelector(".dial-rects");
-    // Bolt: color code — 7-9 left orange, 4-6 yellow, 1-3 green.
-    const color = left === 0 ? "" : left >= 7 ? "orange" : left >= 4 ? "yellow" : "green";
+    const ring = btn.querySelector(".dial-ring");
+    // Bolt: circular progress — 9 segmented marks show digits left to place.
+    const color = left === 0 ? "done" : left >= 7 ? "orange" : left >= 4 ? "yellow" : "green";
     btn.dataset.color = color;
-    rects.innerHTML = Array.from({ length: Math.max(0, Math.min(9, left)) },
-      () => `<i class="${color}"></i>`).join("");
+    ring.style.setProperty("--progress", String((left / 9) * 100));
   });
 }
 
@@ -732,16 +733,24 @@ async function boot() {
   // Bolt: auth buttons removed — local-only, no login screen.
 
   // Map.
+  // Bolt: pointerdown starts navigation immediately on mobile; keyboard click remains supported.
   document.querySelectorAll(".zone-btn, .btn-castle").forEach((btn) => {
-    btn.addEventListener("pointerdown", () => {
+    btn.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
       btn.classList.add("touched");
       window.setTimeout(() => btn.classList.remove("touched"), 420);
+      if (btn.classList.contains("zone-btn")) enterZone(Number(btn.dataset.d));
+      else shopOpen();
     });
   });
   document.querySelectorAll(".zone-btn").forEach((btn) => {
-    btn.addEventListener("click", () => enterZone(Number(btn.dataset.d)));
+    btn.addEventListener("click", (event) => {
+      if (event.detail === 0) enterZone(Number(btn.dataset.d));
+    });
   });
-  $("btn-castle").addEventListener("click", shopOpen);
+  $("btn-castle").addEventListener("click", (event) => {
+    if (event.detail === 0) shopOpen();
+  });
   $("map-resume").addEventListener("click", () => startPuzzleScreen());
 
   // Puzzle controls.
