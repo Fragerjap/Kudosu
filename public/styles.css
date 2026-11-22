@@ -120,6 +120,7 @@ h1, h2, h3 { line-height: 1.2; font-weight: 600; letter-spacing: 0.01em; }
   position: relative;
 }
 .hud .stat .icon { font-size: 0.9em; }
+.currency-icon { width: 22px; height: 22px; object-fit: contain; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)); }
 .hud .spacer { flex: 1; }
 
 /* Bolt: XP progress bar in the HUD */
@@ -182,66 +183,72 @@ h1, h2, h3 { line-height: 1.2; font-weight: 600; letter-spacing: 0.01em; }
 .map-wrap {
   position: relative;
   flex: 1;
+  min-height: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
-  padding: 18px;
-  background:
-    radial-gradient(circle at 50% 42%, rgba(230, 180, 90, 0.16), transparent 55%),
-    linear-gradient(180deg, var(--bg) 0%, var(--bg-soft) 100%);
+  overflow: hidden;
+  background: var(--bg);
 }
+/* Bolt: the uploaded square map fills the available map area without distortion. */
 .map-art {
   position: relative;
-  width: min(420px, 92vw);
-  aspect-ratio: 1 / 1;
-  display: grid;
-  grid-template-areas: ". north ." "west castle east" ". south .";
-  gap: 10px;
-  align-items: center;
-  justify-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: url("/public/assets/img/Sudoku_Adventure_Castle_Map.webp") center / cover no-repeat;
+  overflow: hidden;
+  isolation: isolate;
 }
-.zone-btn {
-  width: 108px;
-  height: 108px;
-  border-radius: 20px;
-  border: 2px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  font-weight: 600;
-  box-shadow: var(--shadow);
-}
-.zone-btn .diff { font-size: 0.75rem; color: var(--ink-soft); }
-.zone-btn[data-d="1"] { grid-area: west; background: linear-gradient(160deg, #bfe4f7, #8fc9ea); color: #173a4d; }
-.zone-btn[data-d="2"] { grid-area: south; background: linear-gradient(160deg, #bfe6c4, #83c48e); color: #1d3f24; }
-.zone-btn[data-d="3"] { grid-area: east; background: linear-gradient(160deg, #ccd2f2, #98a2d9); color: #262c50; }
-.zone-btn[data-d="4"] { grid-area: north; background: linear-gradient(160deg, #f4c1ae, #e08060); color: #4d2117; }
-.zone-btn:active, .zone-btn.touched { transform: scale(1.06); box-shadow: 0 0 0 3px var(--accent); }
-
+/* Bolt: five invisible touch regions — a square castle center and four trapezoids. */
+.zone-btn,
 .btn-castle {
-  grid-area: castle;
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  background: linear-gradient(160deg, #f0e2c8, #d9c090);
-  border: 3px solid var(--gold);
-  color: #4a3a15;
-  font-weight: 700;
+  position: absolute;
+  z-index: 2;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  box-shadow: 0 6px 24px rgba(201, 154, 46, 0.35);
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  color: #fff;
+  background: radial-gradient(circle at center, rgba(255, 230, 132, 0.52), rgba(255, 176, 52, 0.18) 32%, transparent 70%);
+  opacity: 0;
+  transition: opacity 180ms ease, transform 180ms ease, filter 180ms ease;
+  filter: saturate(1.25);
+  -webkit-tap-highlight-color: transparent;
 }
-[data-theme="dark"] .btn-castle { background: linear-gradient(160deg, #3a3222, #2a2415); color: #f0dfae; }
-
+.zone-btn:hover,
+.zone-btn:focus-visible,
+.zone-btn.touched,
+.btn-castle:hover,
+.btn-castle:focus-visible,
+.btn-castle.touched {
+  opacity: 1;
+  outline: none;
+  transform: scale(1.025);
+}
+.zone-btn:active,
+.btn-castle:active { opacity: 1; transform: scale(1.04); }
+.zone-label {
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(8, 28, 34, 0.72);
+  color: #fff8d6;
+  font-size: clamp(0.68rem, 2.5vw, 0.95rem);
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+.zone-north { inset: 0 0 66% 0; clip-path: polygon(0 0, 100% 0, 67% 100%, 33% 100%); }
+.zone-west { inset: 0 66% 0 0; clip-path: polygon(0 0, 100% 33%, 100% 67%, 0 100%); }
+.zone-east { inset: 0 0 0 66%; clip-path: polygon(0 33%, 100% 0, 100% 100%, 0 67%); }
+.zone-south { inset: 66% 0 0 0; clip-path: polygon(33% 0, 67% 0, 100% 100%, 0 100%); }
+.btn-castle { inset: 33% 33% 33% 33%; }
 #map-resume {
   position: absolute;
+  z-index: 4;
   bottom: 14px;
   left: 50%;
   transform: translateX(-50%);
@@ -394,18 +401,12 @@ h1, h2, h3 { line-height: 1.2; font-weight: 600; letter-spacing: 0.01em; }
    ========================================================================== */
 #screen-shop { align-items: center; gap: 14px; padding-top: 24px; }
 .shop-art {
-  width: min(320px, 86vw);
-  aspect-ratio: 4 / 3;
+  width: min(520px, 94vw);
+  aspect-ratio: 16 / 9;
   border-radius: var(--radius);
-  background:
-    radial-gradient(circle at 50% 30%, rgba(240, 210, 140, 0.5), transparent 60%),
-    linear-gradient(160deg, #3a2f45, #241c30);
+  background: url("/public/assets/img/Magical_Wizard_Shop_Inventory.webp") center / cover no-repeat;
   box-shadow: var(--shadow);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #f0dfae;
-  font-size: 3rem;
+  border: 1px solid var(--line);
 }
 .shop-items { width: min(400px, 92vw); display: flex; flex-direction: column; gap: 10px; }
 .shop-items button { text-align: left; padding: 14px 16px; }

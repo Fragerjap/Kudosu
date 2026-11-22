@@ -11,10 +11,10 @@
 // Bolt: constants — zones, economy, level curve
 // ---------------------------------------------------------------------------
 const ZONES = {
-  1: { name: "Meadow", dir: "west", reward: 1, art: "assets/img/zone_easy.webp" },
-  2: { name: "Forest", dir: "south", reward: 2, art: "assets/img/zone_normal.webp" },
-  3: { name: "Peaks", dir: "east", reward: 3, art: "assets/img/zone_hard.webp" },
-  4: { name: "Volcano", dir: "north", reward: 4, art: "assets/img/zone_insane.webp" },
+  1: { name: "Meadow", dir: "west", reward: 1 },
+  2: { name: "Forest", dir: "south", reward: 2 },
+  3: { name: "Peaks", dir: "east", reward: 3 },
+  4: { name: "Volcano", dir: "north", reward: 4 },
 };
 const MAX_HP_BASE = 5;
 const REGEN_MS = 5 * 60 * 60 * 1000; // one HP per 5 hours
@@ -732,6 +732,12 @@ async function boot() {
   // Bolt: auth buttons removed — local-only, no login screen.
 
   // Map.
+  document.querySelectorAll(".zone-btn, .btn-castle").forEach((btn) => {
+    btn.addEventListener("pointerdown", () => {
+      btn.classList.add("touched");
+      window.setTimeout(() => btn.classList.remove("touched"), 420);
+    });
+  });
   document.querySelectorAll(".zone-btn").forEach((btn) => {
     btn.addEventListener("click", () => enterZone(Number(btn.dataset.d)));
   });

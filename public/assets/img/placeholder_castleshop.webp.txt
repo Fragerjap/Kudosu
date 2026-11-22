@@ -1,5 +1,0 @@
-Bolt: placeholder image. The game uses its built-in SVG art while this file
-exists. Replace it with your real `castleshop.webp` (same name without the
-placeholder_ prefix) and the castle shop screen will switch to your artwork.
-
-Expected: cartoonish castle interior with the magician vendor.

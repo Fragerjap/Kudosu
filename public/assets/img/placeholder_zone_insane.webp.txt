@@ -1,2 +1,0 @@
-Bolt: placeholder image. Replace with your real `zone_insane.webp` (remove the
-placeholder_ prefix). Theme: volcano with sudoku-themed props.

@@ -1,7 +1,0 @@
-Bolt: placeholder image. The game uses its built-in SVG art while this file
-exists. Replace it with your real `globalmap.webp` (same name without the
-placeholder_ prefix) and the map screen will switch to your artwork.
-
-Expected: cozy castle with magic towers in the middle, brick paths leading
-west (easy), south (normal), east (hard) and north (insane). Portrait-friendly
-with the center kept clear for the castle button.
