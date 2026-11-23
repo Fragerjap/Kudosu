@@ -17,7 +17,7 @@ const ZONES = {
   4: { name: "Volcano", dir: "north", reward: 6 },
 };
 const MAX_HP_BASE = 5;
-const REGEN_MS = 5 * 60 * 60 * 1000 /5/60*5; // one HP per 5 hours // per 5 mins for tests
+const REGEN_MS = 5 * 60 * 60 * 1000; // one HP per 5 hours
 const DEBT_LIMIT = -50;
 const SHOP_HP_COST = 3;      // gold per HP when player can afford it
 const SHOP_HP_DEBT_COST = 4; // gold per HP added as debt when broke
