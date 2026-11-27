@@ -822,7 +822,7 @@
     const rng = options.rng == null ? Math.random : options.rng;
     if (typeof rng !== "function") throw new Error("rng must be a function returning values from 0 to 1.");
     const maxAttempts = options.maxAttempts == null
-      ? (difficulty >= 3 ? 800 : 100) : Number(options.maxAttempts);
+      ? (difficulty >= 3 ? 800 : 400) : Number(options.maxAttempts);
     if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 1000) {
       throw new Error("maxAttempts must be an integer in the range 1-1000.");
     }
