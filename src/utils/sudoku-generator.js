@@ -86,7 +86,7 @@
         "basicSubsets",
       ],
       requiredFamilies: [],
-      requiredTechniques: ["hiddenSingle"],
+      requiredTechniques: ["lockedCandidates"],
     },
     3: {
       name: "hard",
