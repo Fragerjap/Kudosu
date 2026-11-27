@@ -3,7 +3,7 @@
  * All app assets are pre-cached on install; every fetch is answered from the
  * cache when possible so the game works fully offline (airplane mode test).
  */
-const CACHE = "kudosu-v3";
+const CACHE = "kudosu-v4";
 
 const ASSETS = [
   "./",
